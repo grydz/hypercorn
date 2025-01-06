@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-from ssl import SSLError
-from typing import Any, Generator
+import ssl
+from pathlib import Path
+from typing import Any, Dict, Generator
 
 from .task_group import TaskGroup
 from .worker_context import AsyncioSingleTask, WorkerContext
 from ..config import Config
 from ..events import Closed, Event, RawData, Updated
+from ..extensions.tls import TLS_CIPHER_SUITES, TLS_VERSIONS
 from ..protocol import ProtocolWrapper
 from ..typing import AppWrapper, ConnectionState, LifespanState
 from ..utils import parse_socket_addr
@@ -46,11 +48,28 @@ class TCPServer:
             client = parse_socket_addr(socket.family, socket.getpeername())
             server = parse_socket_addr(socket.family, socket.getsockname())
             ssl_object = self.writer.get_extra_info("ssl_object")
+            tls: Dict[str, Any] = {
+                "server_cert": None,
+                "client_cert_chain": [],
+                "client_cert_name": None,
+                "client_cert_error": None,
+                "tls_version": None,
+                "cipher_suite": None,
+            }
             if ssl_object is not None:
-                ssl = True
+                _ssl = True
                 alpn_protocol = ssl_object.selected_alpn_protocol()
+                if client_cert_chain := ssl_object.getpeercert(binary_form=True):
+                    tls["client_cert_chain"].append(ssl.DER_cert_to_PEM_cert(client_cert_chain))
+                if cipher := ssl_object.cipher():
+                    (cipher_name, ssl_version, _cipher_nbits) = cipher
+                    tls["cipher_suite"] = TLS_CIPHER_SUITES.get(cipher_name)
+                    tls["tls_version"] = TLS_VERSIONS.get(ssl_version)
+                server_cert = Path(self.config.certfile).resolve()
+                if server_cert.is_file():
+                    tls["server_cert"] = Path(server_cert).read_text()
             else:
-                ssl = False
+                _ssl = False
                 alpn_protocol = "http/1.1"
 
             async with TaskGroup(self.loop) as task_group:
@@ -61,7 +80,8 @@ class TCPServer:
                     self.context,
                     task_group,
                     ConnectionState(self.state.copy()),
-                    ssl,
+                    _ssl,
+                    tls,
                     client,
                     server,
                     self.protocol_send,
@@ -100,7 +120,7 @@ class TCPServer:
                 OSError,
                 asyncio.TimeoutError,
                 TimeoutError,
-                SSLError,
+                ssl.SSLError,
             ):
                 break
             else:

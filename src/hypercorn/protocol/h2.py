@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Awaitable, Callable, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Tuple, Type, Union
 
 import h2
 import h2.connection
@@ -87,6 +87,7 @@ class H2Protocol:
         task_group: TaskGroup,
         connection_state: ConnectionState,
         ssl: bool,
+        tls: Optional[Dict[str, Any]],
         client: Optional[Tuple[str, int]],
         server: Optional[Tuple[str, int]],
         send: Callable[[Event], Awaitable[None]],
@@ -116,6 +117,7 @@ class H2Protocol:
         self.send = send
         self.server = server
         self.ssl = ssl
+        self.tls = tls
         self.streams: Dict[int, Union[HTTPStream, WSStream]] = {}
         # The below are used by the sending task
         self.has_data = self.context.event_class()
@@ -329,6 +331,7 @@ class H2Protocol:
                 self.context,
                 self.task_group,
                 self.ssl,
+                self.tls,
                 self.client,
                 self.server,
                 self.stream_send,
@@ -341,6 +344,7 @@ class H2Protocol:
                 self.context,
                 self.task_group,
                 self.ssl,
+                self.tls,
                 self.client,
                 self.server,
                 self.stream_send,

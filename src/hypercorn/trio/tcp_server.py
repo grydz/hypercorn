@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ssl
 from math import inf
-from typing import Any, Generator
+from pathlib import Path
+from typing import Any, Dict, Generator
 
 import trio
 
@@ -38,6 +40,7 @@ class TCPServer:
         return self.run().__await__()
 
     async def run(self) -> None:
+        tls: Dict[str, Any]
         try:
             try:
                 with trio.fail_after(self.config.ssl_handshake_timeout):
@@ -46,11 +49,25 @@ class TCPServer:
                 return  # Handshake failed
             alpn_protocol = self.stream.selected_alpn_protocol()
             socket = self.stream.transport_stream.socket
-            ssl = True
+            _ssl = True
+            tls = {
+                "server_cert": None,
+                "client_cert_chain": [],
+                "client_cert_name": None,
+                "client_cert_error": None,
+                "tls_version": None,
+                "cipher_suite": None,
+            }
+            if client_cert_chain := self.stream.getpeercert(binary_form=True):
+                tls["client_cert_chain"].append(ssl.DER_cert_to_PEM_cert(client_cert_chain))
+            server_cert = Path(self.config.certfile).resolve()
+            if server_cert.is_file():
+                tls["server_cert"] = Path(server_cert).read_text()
         except AttributeError:  # Not SSL
             alpn_protocol = "http/1.1"
             socket = self.stream.socket
-            ssl = False
+            _ssl = False
+            tls = {}
 
         try:
             client = parse_socket_addr(socket.family, socket.getpeername())
@@ -64,7 +81,8 @@ class TCPServer:
                     self.context,
                     task_group,
                     ConnectionState(self.state.copy()),
-                    ssl,
+                    _ssl,
+                    tls,
                     client,
                     server,
                     self.protocol_send,

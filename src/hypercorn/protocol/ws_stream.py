@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import auto, Enum
 from io import BytesIO, StringIO
 from time import time
-from typing import Awaitable, Callable, Iterable, List, Optional, Tuple, Union
+from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional, Tuple, Union
 from urllib.parse import unquote
 
 from wsproto.connection import Connection, ConnectionState, ConnectionType
@@ -170,6 +170,7 @@ class WSStream:
         context: WorkerContext,
         task_group: TaskGroup,
         ssl: bool,
+        tls: Optional[Dict[str, Any]],
         client: Optional[Tuple[str, int]],
         server: Optional[Tuple[str, int]],
         send: Callable[[Event], Awaitable[None]],
@@ -188,6 +189,7 @@ class WSStream:
         self.send = send
         # RFC 8441 for HTTP/2 says use http or https, ASGI says ws or wss
         self.scheme = "wss" if ssl else "ws"
+        self.tls = tls
         self.server = server
         self.start_time: float
         self.state = ASGIWebsocketState.HANDSHAKE
@@ -223,6 +225,9 @@ class WSStream:
                 "subprotocols": self.handshake.subprotocols or [],
                 "extensions": {"websocket.http.response": {}},
             }
+
+            if self.tls is not None:
+                self.scope["extensions"]["tls"] = self.tls
 
             if not valid_server_name(self.config, event):
                 await self._send_error_response(404)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Awaitable, Callable, Optional, Tuple, Union
+from typing import Any, Awaitable, Callable, Dict, Optional, Tuple, Union
 
 from .h2 import H2Protocol
 from .h11 import H2CProtocolRequiredError, H2ProtocolAssumedError, H11Protocol
@@ -18,6 +18,7 @@ class ProtocolWrapper:
         task_group: TaskGroup,
         state: ConnectionState,
         ssl: bool,
+        tls: Optional[Dict[str, Any]],
         client: Optional[Tuple[str, int]],
         server: Optional[Tuple[str, int]],
         send: Callable[[Event], Awaitable[None]],
@@ -28,6 +29,7 @@ class ProtocolWrapper:
         self.context = context
         self.task_group = task_group
         self.ssl = ssl
+        self.tls = tls
         self.client = client
         self.server = server
         self.send = send
@@ -41,6 +43,7 @@ class ProtocolWrapper:
                 self.task_group,
                 self.state,
                 self.ssl,
+                self.tls,
                 self.client,
                 self.server,
                 self.send,
@@ -53,6 +56,7 @@ class ProtocolWrapper:
                 self.task_group,
                 self.state,
                 self.ssl,
+                self.tls,
                 self.client,
                 self.server,
                 self.send,
@@ -72,6 +76,7 @@ class ProtocolWrapper:
                 self.task_group,
                 self.state,
                 self.ssl,
+                self.tls,
                 self.client,
                 self.server,
                 self.send,
@@ -87,6 +92,7 @@ class ProtocolWrapper:
                 self.task_group,
                 self.state,
                 self.ssl,
+                self.tls,
                 self.client,
                 self.server,
                 self.send,
